@@ -1,0 +1,313 @@
+\documentclass[oneside,a4paper,14pt]{extarticle}
+\usepackage[T1,T2A]{fontenc}
+\usepackage[a4paper,
+letterpaper,top=20mm,bottom=20mm,
+left=30mm,right=10mm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{textcomp}
+\usepackage{indentfirst}
+\usepackage{graphicx}
+\usepackage{mwe}
+\usepackage{pdfpages}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{adjustbox}
+\usepackage{caption}
+\usepackage{comment}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{titlesec}
+
+\captionsetup[figure]{name = {Рисунок}, labelsep=endash}
+\titleformat{\section}{\normalsize\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+\renewcommand\baselinestretch{1.33}\normalsize
+\setlength{\parindent}{1.25cm}
+
+\lstset{
+    frame=tb,
+    extendedchars=false,
+    inputencoding=utf8,
+    numbers=left,
+    language=Python,
+    aboveskip=3mm,
+    belowskip=3mm,
+    showstringspaces=false,
+    basicstyle=\small\ttfamily,
+    breaklines=true,
+    breakatwhitespace=false,
+    columns=fullflexible,
+    tabsize=2,
+    keepspaces=true,
+    linewidth=\linewidth,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{orange},
+}
+
+\begin{document}
+\pagestyle{empty}
+\begin{center}
+    {МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ \\
+    Федеральное государственное бюджетное образовательное учреждение высшего образования \\
+    «Вятский государственный университет» (ФГБОУ ВО «ВятГУ») \\
+    Факультет автоматики и вычислительной техники \\
+    Кафедра электронных вычислительных машин \\ }
+
+    \vspace*{35mm}
+
+    {«Сценарное и функциональное программирование» \\
+    Лабораторная работа №2 \\ }
+\end{center}
+
+\vspace*{35mm}
+       Выполнил студент группы ИВТб-3302-05-00 \hspace*{1mm} \underline{\hspace{10mm}} /Фофанов А.С./  \\
+       \hspace*{12mm}Проверил преподаватель \hspace*{44mm} \underline{\hspace{10mm}} /\hspace{30mm}/ \\
+
+\begin{center}
+    \vspace*{35mm}
+    \large{Киров \\
+    2026}
+\end{center}
+
+\newpage
+\pagestyle{plain}
+\setcounter{page}{2}
+\normalsize
+
+\section*{Цель работы}
+Разработать костяк backend-сервиса на языке Python для управления пользователями и OAuth-клиентами. Сервис должен предоставлять GraphQL API, реализовывать аутентификацию по JWT (HS256), безопасно хранить пароли с использованием Argon2id и pepper, вести аудит действий пользователя и предоставлять минимальную админ-панель.
+
+\section*{Задание}
+\begin{enumerate}
+    \item Спроектировать слой данных на SQLAlchemy 2.x и настроить миграции через Alembic.
+    \item Организовать FastAPI-приложение с разделением на модули.
+    \item Реализовать GraphQL API на библиотеке Ariadne (schema-first: SDL-схема, резолверы, контекст, директивы-пермишены).
+    \item Реализовать базовую аутентификацию по JWT (HS256) без OAuth2.
+    \item Реализовать безопасное хэширование паролей: Argon2id, глобальный pepper, оценка стойкости через zxcvbn.
+    \item Реализовать аудит действий пользователя в таблице audit\_events.
+    \item Создать минимальный SPA-интерфейс администратора на vanilla JS.
+    \item Покрыть ключевые сценарии тестами на pytest.
+\end{enumerate}
+
+\section*{Описание реализации}
+
+Проект состоит из следующих модулей:
+
+\begin{itemize}
+    \item \texttt{main.py} — точка входа FastAPI-приложения, подключает роутеры и монтирует ASGI-приложения;
+    \item \texttt{config.py} — конфигурация через pydantic-settings, читает \texttt{.env};
+    \item \texttt{db/base.py}, \texttt{db/session.py} — декларативный Base SQLAlchemy, движок, фабрика сессий, зависимость \texttt{get\_db};
+    \item \texttt{models/user.py}, \texttt{models/oauth\_client.py}, \texttt{models/audit\_event.py} — ORM-модели;
+    \item \texttt{core/passwords.py} — хэширование Argon2id, pepper, zxcvbn;
+    \item \texttt{core/jwt.py} — выпуск и проверка JWT (HS256);
+    \item \texttt{core/deps.py} — зависимости FastAPI для аутентификации;
+    \item \texttt{auth/router.py}, \texttt{auth/service.py}, \texttt{auth/schemas.py} — REST-эндпоинты /auth/*;
+    \item \texttt{audit/service.py}, \texttt{audit/events.py} — единая точка записи событий аудита;
+    \item \texttt{graphql/schema.graphql}, \texttt{schema.py}, \texttt{resolvers.py}, \texttt{context.py}, \texttt{directives.py} — GraphQL API на Ariadne;
+    \item \texttt{static/index.html}, \texttt{app.js}, \texttt{style.css} — мини-админка на vanilla JS.
+\end{itemize}
+
+Конфигурация приложения хранится в файле \texttt{.env} и включает: строку подключения к базе данных, секрет для подписи JWT, алгоритм, время жизни токена, pepper для паролей, минимальную длину пароля.
+
+\subsection*{Модуль core/passwords.py}
+
+Модуль реализует хэширование паролей с использованием Argon2id. Перед хэшированием к паролю добавляется глобальный pepper, хранящийся в переменных окружения. Оценка стойкости пароля выполняется через zxcvbn с требованием score не ниже 3.
+
+\begin{lstlisting}
+_hasher = PasswordHasher(
+    time_cost=3,
+    memory_cost=65536,
+    parallelism=4,
+    hash_len=32,
+    salt_len=16,
+)
+
+def hash_password(password: str) -> str:
+    if not isinstance(password, str) or not password:
+        raise WeakPasswordError("Пароль не может быть пустым.")
+    peppered = password + settings.password_pepper
+    return _hasher.hash(peppered)
+
+def validate_policy(password, user_inputs=None):
+    if len(password) < settings.password_min_length:
+        raise WeakPasswordError("Пароль не должен быть короче N символов.")
+    result = zxcvbn(password, user_inputs=user_inputs or [])
+    if result["score"] < 3:
+        raise WeakPasswordError("Слишком слабый пароль.")
+
+\subsection*{Модуль core/jwt.py}
+
+Модуль выпускает и проверяет JWT-токены с использованием HS256. В payload включаются claims \texttt{sub}, \texttt{iat}, \texttt{exp}, \texttt{jti}, \texttt{typ}. Поле \texttt{sub} приводится к строке в соответствии с RFC 7519. При декодировании проверяется подпись и срок действия.
+
+\begin{lstlisting}
+def create_access_token(sub, ttl_min=None):
+    if ttl_min is None:
+        ttl_min = settings.access_token_ttl_min
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(sub),
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=ttl_min)).timestamp()),
+        "jti": uuid4().hex,
+        "typ": "access",
+    }
+    return jwt.encode(payload, settings.jwt_secret,
+                      algorithm=settings.jwt_algorithm)
+
+def decode_token(token: str) -> dict:
+    if not token or not isinstance(token, str):
+        raise ValueError("Пустой токен.")
+    try:
+        payload = jwt.decode(token, settings.jwt_secret,
+                             algorithms=[settings.jwt_algorithm])
+    except JWTError as e:
+        raise ValueError("Невалидный токен") from e
+    if payload.get("typ") != "access":
+        raise ValueError("Не access-токен.")
+    return payload
+\end{lstlisting}
+
+\subsection*{Модуль auth/service.py}
+
+Сервисный слой содержит бизнес-логику регистрации и логина, используется как REST-роутером, так и GraphQL-резолвером. При неудачном логине всегда возвращается одно и то же исключение \texttt{InvalidCredentialsError}, что не позволяет клиенту различить случаи «несуществующий email» и «неверный пароль».
+
+\begin{lstlisting}
+def register_user(db, *, email, password, request=None):
+    email_norm = email.strip().lower()
+    existing = db.execute(
+        select(User).where(User.email == email_norm)
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise EmailAlreadyExistsError("Email already registered")
+    validate_policy(password, user_inputs=[email_norm])
+    user = User(
+        email=email_norm,
+        hashed_password=hash_password(password),
+        is_active=True, is_admin=False,
+    )
+    db.add(user)
+    db.flush()
+    write_event(db, UserEvents.CREATED, actor_id=user.id, ...)
+    token = create_access_token(sub=user.id)
+    return user, token
+\end{lstlisting}
+
+\subsection*{Модели базы данных}
+
+Модель \texttt{User} содержит email (уникальный, индексируемый), хэш пароля, флаги \texttt{is\_active} и \texttt{is\_admin}, дату создания. Модель \texttt{OAuthClient} хранит метаданные клиента: \texttt{client\_id}, имя, флаг конфиденциальности, список \texttt{redirect\_uris}. Модель \texttt{AuditEvent} фиксирует события: тип, актора, IP, User-Agent, произвольные metadata в формате JSON.
+
+\begin{lstlisting}
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+\subsection*{Модуль graphql/schema.py}
+
+GraphQL API реализован на библиотеке Ariadne в schema-first стиле. Схема описана в отдельном файле \texttt{schema.graphql}. К полям Query и Mutation привязаны резолверы, реализованы директивы-пермишены \texttt{@isAuthenticated} и \texttt{@isAdmin}. Для преобразования имён полей из camelCase в snake\_case используется \texttt{snake\_case\_fallback\_resolvers}.
+
+\begin{lstlisting}
+schema = make_executable_schema(
+    type_defs,
+    query,
+    mutation,
+    audit_event_type,
+    snake_case_fallback_resolvers,
+    directives={
+        "isAuthenticated": IsAuthenticatedDirective,
+        "isAdmin": IsAdminDirective,
+    },
+)
+
+graphql_app = GraphQL(
+    schema,
+    context_value=get_context_value,
+    debug=True,
+)
+\end{lstlisting}
+
+\subsection*{Модуль audit/service.py}
+
+Аудит реализован через единую функцию \texttt{write\_event}, которая создаёт запись в таблице \texttt{audit\_events} и коммитит транзакцию. Имена событий соответствуют соглашению \texttt{<объект>.<действие>}. Для защиты от записи секретов в metadata предусмотрена проверка по списку запрещённых ключей.
+
+\begin{lstlisting}
+FORBIDDEN_METADATA_KEYS = frozenset({
+    "password", "hashed_password", "token",
+    "access_token", "refresh_token", "secret", "pepper", "jwt",
+})
+
+def write_event(db, event_type, *, actor_id=None, client_id=None,
+                ip=None, user_agent=None, metadata=None):
+    if metadata:
+        forbidden = FORBIDDEN_METADATA_KEYS & metadata.keys()
+        if forbidden:
+            raise ValueError(f"Аудит не должен содержать секреты: {forbidden}")
+    event = AuditEvent(
+        event_type=event_type, actor_id=actor_id,
+        client_id=client_id, ip=ip, user_agent=user_agent,
+        metadata_json=metadata,
+    )
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
+\end{lstlisting}
+
+\subsection*{Мини-админка}
+
+Админ-панель реализована на vanilla JS. Она взаимодействует с REST-эндпоинтом \texttt{/auth/login} для получения JWT и с GraphQL-эндпоинтом \texttt{/graphql/} для запросов к данным. Токен хранится в localStorage. В интерфейсе доступны: список OAuth-клиентов, создание клиента, просмотр профиля, список пользователей и отключение пользователя.
+
+\begin{lstlisting}
+async function gql(query, variables = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const response = await fetch('/graphql/', {
+        method: 'POST', headers,
+        body: JSON.stringify({ query, variables }),
+    });
+    return response.json();
+}
+\end{lstlisting}
+
+\section*{Тестирование}
+
+Ключевые сценарии покрыты тестами на pytest. Тесты используют отдельную базу данных SQLite, которая создаётся и удаляется автоматически. Фикстуры pytest обеспечивают изоляцию между тестами. Всего реализовано 42 теста, покрывающих: политику паролей, хэширование и проверку, REST-эндпоинты /auth/*, GraphQL-запросы и мутации, работу директив-пермишенов, ведение аудита.
+
+\section*{Экранные формы}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{1.png}
+    \caption{Страница входа в админ-панель}
+    \label{fig:admin-login}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{2.png}
+    \caption{Таблица пользователей в админ-панели}
+    \label{fig:admin-users}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{3.png}
+    \caption{Swagger UI с REST-эндпоинтами}
+    \label{fig:swagger}
+\end{figure}
+
+\clearpage
+\section*{Вывод}
+В ходе выполнения лабораторной работы был разработан костяк backend-сервиса Vault для управления пользователями и OAuth-клиентами. Реализованы: слой данных на SQLAlchemy 2.x с миграциями Alembic, REST-эндпоинты аутентификации на FastAPI, GraphQL API на Ariadne с директивами-пермишенами, безопасное хэширование паролей (Argon2id + pepper + zxcvbn), выпуск и проверка JWT (HS256), аудит значимых действий пользователя, минимальная админ-панель на vanilla JS. Все ключевые сценарии покрыты тестами. Сервис готов к расширению OAuth2/OIDC в следующей лабораторной работе.
+
+\end{document}
