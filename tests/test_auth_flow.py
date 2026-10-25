@@ -22,7 +22,7 @@ class TestRegister:
         assert len(body["access_token"]) > 50
 
 
-    def tesr_register_create_audit(
+    def test_register_create_audit(
             self, client: TestClient, db_session: Session
     ):
         client.post(
@@ -32,7 +32,7 @@ class TestRegister:
                 "password": "some long long string as password",
             },
         )
-        events = db_session.query(AuditEvent).filter_by(event_type="user.created".all())
+        events = db_session.query(AuditEvent).filter_by(event_type="user.created").all()
         assert len(events) == 1
         assert events[0].metadata_json["email"] == "audit@example.com"
 
@@ -78,7 +78,7 @@ class TestLogin:
 
     def test_login_wrong_password(self, client: TestClient, regular_user: User):
         resp = client.post(
-            "auth/login",
+            "/auth/login",
             json={
                 "email": regular_user.email,
                 "password": "wrong password",

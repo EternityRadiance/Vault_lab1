@@ -33,7 +33,7 @@ def decode_token(token: str) -> dict:
             algorithms=[settings.jwt_algorithm],
         )
     except JWTError as e:
-        raise ValueError(f"Невалидный токен") from e
+        raise ValueError("Невалидный токен") from e
 
     if not isinstance(payload, dict):
         raise ValueError("Некорректный payload токена.")

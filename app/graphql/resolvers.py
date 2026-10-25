@@ -147,8 +147,8 @@ def resolve_disable_user(obj, info, user_id):
         UserEvents.DISABLED,
         actor_id=current_user.id,
         ip=info_dict["ip"],
-    user_agent=info_dict["user_agent"],
-    metadata={"target_user_id": target.id, "target_email": target.email},
+        user_agent=info_dict["user_agent"],
+        metadata={"target_user_id": target.id, "target_email": target.email},
     )
 
     return target
