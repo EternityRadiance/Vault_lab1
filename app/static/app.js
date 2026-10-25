@@ -1,7 +1,5 @@
 const TOKEN_KEY = 'vault_admin_token';
 
-// --- Утилиты ---
-
 async function api(path, body) {
     const response = await fetch(path, {
         method: 'POST',
@@ -55,8 +53,6 @@ function escapeHtml(s) {
         .replaceAll("'", '&#39;');
 }
 
-// --- Логин / логаут ---
-
 async function handleLogin(event) {
     event.preventDefault();
     hideError('login-error');
@@ -92,8 +88,6 @@ function handleLogout() {
     document.getElementById('profile-output').classList.add('hidden');
     renderAuthState();
 }
-
-// --- Клиенты ---
 
 async function loadClients() {
     hideError('clients-error');
@@ -166,8 +160,6 @@ async function handleCreateClient() {
     await loadClients();
 }
 
-// --- Профиль ---
-
 async function loadProfile() {
     const output = document.getElementById('profile-output');
     output.textContent = 'Загрузка...';
@@ -192,8 +184,6 @@ async function loadProfile() {
 
     output.textContent = JSON.stringify(result.data.me, null, 2);
 }
-
-// --- Пользователи ---
 
 async function loadUsers() {
     hideError('users-error');
@@ -268,8 +258,6 @@ async function disableUser(userId) {
 
     await loadUsers();
 }
-
-// --- Инициализация ---
 
 document.addEventListener('DOMContentLoaded', () => {
     renderAuthState();

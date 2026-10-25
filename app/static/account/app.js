@@ -1,15 +1,4 @@
-/**
- * Vault — страница аккаунта.
- *
- * Три состояния:
- *   - register  — форма регистрации (если нет токена)
- *   - login     — форма логина (если нет токена, но пользователь переключился)
- *   - profile   — профиль (если есть токен)
- */
-
 const TOKEN_KEY = 'vault_account_token';
-
-// --- Утилиты ---
 
 async function api(path, body) {
     const response = await fetch(path, {
@@ -46,8 +35,6 @@ function hideError(elementId) {
     document.getElementById(elementId).classList.add('hidden');
 }
 
-// --- Регистрация ---
-
 async function handleRegister(event) {
     event.preventDefault();
     hideError('register-error');
@@ -72,8 +59,6 @@ async function handleRegister(event) {
         showError('register-error', 'Сеть недоступна: ' + err.message);
     }
 }
-
-// --- Логин ---
 
 async function handleLogin(event) {
     event.preventDefault();
@@ -100,8 +85,6 @@ async function handleLogin(event) {
     }
 }
 
-// --- Профиль ---
-
 async function loadProfile() {
     hideError('profile-error');
     const output = document.getElementById('profile-output');
@@ -110,7 +93,6 @@ async function loadProfile() {
     const { status, data } = await apiGet('/auth/me');
 
     if (status === 401) {
-        // Токен протух — возвращаемся на логин
         localStorage.removeItem(TOKEN_KEY);
         show('login-section');
         return;
@@ -125,14 +107,10 @@ async function loadProfile() {
     show('profile-section');
 }
 
-// --- Логаут ---
-
 function handleLogout() {
     localStorage.removeItem(TOKEN_KEY);
     show('login-section');
 }
-
-// --- Переключение между формами ---
 
 function switchToLogin(event) {
     event.preventDefault();
@@ -146,8 +124,6 @@ function switchToRegister(event) {
     show('register-section');
 }
 
-// --- Инициализация ---
-
 document.addEventListener('DOMContentLoaded', () => {
     // Обработчики
     document.getElementById('register-form').addEventListener('submit', handleRegister);
@@ -157,7 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('to-login').addEventListener('click', switchToLogin);
     document.getElementById('to-register').addEventListener('click', switchToRegister);
 
-    // Стартовое состояние
     const token = localStorage.getItem(TOKEN_KEY);
     if (token) {
         loadProfile();
